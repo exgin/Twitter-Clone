@@ -9,6 +9,7 @@ from models import db, connect_db, User, Message
 
 CURR_USER_KEY = "curr_user"
 
+
 app = Flask(__name__)
 
 # Get DB_URI from environ variable (useful for production/testing) or,
@@ -24,7 +25,7 @@ toolbar = DebugToolbarExtension(app)
 
 connect_db(app)
 
-
+db.create_all()
 ##############################################################################
 # User signup/login/logout
 
@@ -92,10 +93,10 @@ def signup():
 @app.route('/login', methods=["GET", "POST"])
 def login():
     """Handle user login."""
-
     form = LoginForm()
 
     if form.validate_on_submit():
+
         user = User.authenticate(form.username.data,
                                  form.password.data)
 

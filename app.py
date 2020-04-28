@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
-from forms import UserAddForm, LoginForm, MessageForm
+from forms import UserAddForm, LoginForm, MessageForm, EditUserForm
 from models import db, connect_db, User, Message
 
 CURR_USER_KEY = "curr_user"
@@ -30,6 +30,7 @@ db.create_all()
 # User signup/login/logout
 
 
+# Keeps our user logged in & is ran before every request
 @app.before_request
 def add_user_to_g():
     """If we're logged in, add curr user to Flask global."""
@@ -113,12 +114,15 @@ def login():
 @app.route('/logout')
 def logout():
     """Handle logout of user."""
+    do_logout()
 
-    # IMPLEMENT THIS
+    flash("Logged out!", 'success')
 
+    return redirect('/')
 
 ##############################################################################
 # General user routes:
+
 
 @app.route('/users')
 def list_users():
@@ -212,7 +216,31 @@ def stop_following(follow_id):
 def profile():
     """Update profile for current user."""
 
-    # IMPLEMENT THIS
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    user = g.user
+    form = EditUserForm(obj=user)
+
+    DEFAULT_PROFILE_PIC = "/static/images/default-pic.png"
+    DEF_HEAD_PIC = "/static/images/warbler-hero.jpg"
+
+    if form.validate_on_submit():
+        # authenticate user
+        if User.authenticate(user.username, form.password.data):
+            user.username = form.username.data
+            user.email = form.email.data
+            user.image_url = form.image_url.data or DEFAULT_PROFILE_PIC
+            user.header_image_url = form.header_image_url.data or DEF_HEAD_PIC
+            user.bio = form.bio.data
+
+            db.session.commit()
+            return redirect(f'/users/{user.id}')
+
+        flash("Wrong password, try again to complete changes.", 'danger')
+
+    return render_template('users/edit.html', user_id=user.id, form=form)
 
 
 @app.route('/users/delete', methods=["POST"])
@@ -231,9 +259,20 @@ def delete_user():
     return redirect("/signup")
 
 
+@app.route('/users/<int:user_id>/likes')
+def show_likes(user_id):
+    """Show all of the user's liked messges"""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    user = User.query.get_or_404(user_id)
+
+    return render_template('users/likes.html', user=user, likes=user.likes)
+
 ##############################################################################
 # Messages routes:
-
 @app.route('/messages/new', methods=["GET", "POST"])
 def messages_add():
     """Add a message:
@@ -280,6 +319,26 @@ def messages_destroy(message_id):
     return redirect(f"/users/{g.user.id}")
 
 
+@app.route('/messages/<int:message_id>/like', methods=['POST'])
+def add_like(message_id):
+    """Handle toggling a liked messege for current user"""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect('/')
+
+    message = Message.query.get_or_404(message_id)
+
+    user_likes = g.user.likes
+
+    if message in user_likes:
+        g.user.likes = [like for like in user_likes if like != message]
+    else:
+        g.user.likes.append(message)
+
+    db.session.commit()
+
+    return redirect('/`')
 ##############################################################################
 # Homepage and error pages
 
@@ -293,12 +352,17 @@ def homepage():
     """
 
     if g.user:
+        # + [g.user.id] because we're showing users that only the logged-in
+        # user is following
+        followers_id = [
+            follower.id for follower in g.user.following] + [g.user.id]
+
         messages = (Message
                     .query
+                    .filter(Message.user_id.in_(followers_id))
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
-
         return render_template('home.html', messages=messages)
 
     else:

@@ -327,18 +327,18 @@ def add_like(message_id):
         flash("Access unauthorized.", "danger")
         return redirect('/')
 
-    message = Message.query.get_or_404(message_id)
+    liked_message = Message.query.get_or_404(message_id)
 
     user_likes = g.user.likes
 
-    if message in user_likes:
-        g.user.likes = [like for like in user_likes if like != message]
+    if liked_message in user_likes:
+        g.user.likes = [like for like in user_likes if like != liked_message]
     else:
-        g.user.likes.append(message)
+        g.user.likes.append(liked_message)
 
     db.session.commit()
 
-    return redirect('/`')
+    return redirect('/')
 ##############################################################################
 # Homepage and error pages
 

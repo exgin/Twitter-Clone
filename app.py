@@ -37,7 +37,6 @@ def add_user_to_g():
 
     if CURR_USER_KEY in session:
         g.user = User.query.get(session[CURR_USER_KEY])
-
     else:
         g.user = None
 
@@ -353,7 +352,7 @@ def homepage():
 
     if g.user:
         # + [g.user.id] because we're showing users that only the logged-in
-        # user is following
+
         followers_id = [
             follower.id for follower in g.user.following] + [g.user.id]
 
